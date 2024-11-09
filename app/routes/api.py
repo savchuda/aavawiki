@@ -79,7 +79,7 @@ def login():
     token = jwt.encode({'user_id': user.id, 'exp': datetime.utcnow() + timedelta(hours=1)}, db.app.config['SECRET_KEY'])
     return jsonify({"token": token})
 
-@api.route('/api/test', methods=['POST'])
+@api.route('/api/test_result', methods=['POST'])
 def take_test():
     token = request.headers.get('Authorization')
     if not token:
@@ -93,29 +93,31 @@ def take_test():
     except jwt.InvalidTokenError:
         return jsonify({"error": "Invalid token"}), 401
 
-    score = request.json.get('score', 0)
+    score = request.json.get('score', None)
     test_result = TestResult(user_id=user_id, score=score)
     db.session.add(test_result)
     db.session.commit()
 
     return jsonify({"message": "Test completed", "score": score})
 
-@api.route('/api/chat', methods=['POST'])
-def chat_with_gpt():
-    data = request.json
-    prompt = data.get("prompt")
-    
-    if not prompt:
-        return jsonify({"error": "No prompt provided"}), 400
+
+@api.route('/api/sdt_check', methods=['POST'])
+def take_test():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({"error": "Token is missing"}), 401
 
     try:
-        response = openai.Completion.create(
-            model="gpt-4-turbo",
-            prompt=prompt,
-            max_tokens=150,
-            temperature=0.7
-        )
-        message = response.choices[0].text.strip()
-        return jsonify({"response": message})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        decoded_token = jwt.decode(token, db.app.config['SECRET_KEY'], algorithms=['HS256'])
+        user_id = decoded_token['user_id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token has expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Invalid token"}), 401
+
+    score = request.json.get('score', None)
+    test_result = TestResult(user_id=user_id, sdt_rose=score)
+    db.session.add(test_result)
+    db.session.commit()
+
+    return jsonify({"message": "Test completed", "score": score})
